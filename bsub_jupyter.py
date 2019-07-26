@@ -1,5 +1,5 @@
-from __future__ import print_function
 #!/usr/bin/env python
+
 '''
 Jupyter_Bsub - Luca Pinello & Kendell Clement 2017
 Connect to a LSF main node directly or trough a ssh jump node, launch a jupyter notebook via bsub and open automatically a tunnel.
@@ -88,27 +88,27 @@ def open_connect(ssh_cmd, server, bsub_args, connection_filename,
                  localport, remoteport, env='', debug=False):
     #launch a job
     if args.env:
-    	env_cmd = 'source activate {0} &&'.format(args.env)
+        env_cmd = 'source activate {0} &&'.format(env)
     else:
-    	env_cmd = ''
+        env_cmd = ''
     cmd_ssh = '{ssh:s} -t {server:s}'.format(ssh=ssh_cmd, server=server)
     cmd_bsub = ('''bsub -q {queue:s} -n {n_cores:d} -M {memory:d} '''
-                '''-cwd {remote_path:s} -R 'rusage[mem={memory:d}]' ''').format(
+                '''-cwd {remote_path:s} -R 'rusage[mem={memory:d}]' '''
+                '''-R span[hosts=1] -P {account:s}''').format(
                     **bsub_args)
     cmd_jupyter = '''jupyter notebook --port={:d} --no-browser'''.format(
         remoteport)
-    cmd_redirect = "2>&1 > {:s}".format(connection_filename)
+    cmd_redirect  = "2>&1 > {:s}".format(connection_filename)
     cmd = '''{ssh} "{bsub} '{env} {jupyter}' {redirect}" 2>/dev/null'''
     cmd = cmd.format(ssh=cmd_ssh, bsub=cmd_bsub, env=env_cmd,
                      jupyter=cmd_jupyter, redirect=cmd_redirect)
-    if debug: print(cmd_jupyter)
-    sb.call( cmd_jupyter,shell=True)
+    if debug: print(cmd)
+    sb.call(cmd, shell=True)
     cmd_file_write = '{ssh} "echo {local:d},{remote:d} >> {fn:s}" 2> /dev/null'
     cmd_file_write = cmd_file_write.format(ssh=cmd_ssh, local=localport,
         remote=remoteport, fn=connection_filename)
     if debug: print(cmd_file_write)
     sb.call(cmd_file_write,shell=True)
-    connection_status = True
 
 print('''
  _               _           _                   _
@@ -125,22 +125,21 @@ print( 'Version %s\n' % __version__)
 parser = argparse.ArgumentParser(description='bsub_jupyter\n\n- Connect to a LSF main node directly or trough a ssh jump node, launch a jupyter notebook via bsub and open automatically a tunnel.',formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument('lsf_server', type=str,  help='username@server, the server is the main LSF node used to submit jobs with bsub')
 parser.add_argument('connection_name', type=str,  help='Name of the connection')
+parser.add_argument('-P', '--account', type=str,  help='Account to submit job from')
 
 
 #OPTIONALS
 parser.add_argument('--remote_path', type=str,  help='remote path to use',default='~')
 parser.add_argument('--bastion_server',  help='SSH jump server, format username@server', default=None)
-parser.add_argument('--memory', type=int,  help='Memory to request', default=64000)
-parser.add_argument('--n_cores', type=int,  help='# of cores to request', default=8)
-parser.add_argument('--queue', type=str,  help='Queue to submit job',default='big-multi')
+parser.add_argument('-m', '--memory', type=int,  help='Memory to request (per core)', default=4000)
+parser.add_argument('-n', '--n_cores', type=int,  help='# of cores to request', default=2)
+parser.add_argument('-q', '--queue', type=str,  help='Queue to submit job',default='premium')
 parser.add_argument('--force_new_connection',  help='Ignore any existing connection file and start a new connection', action='store_true')
 parser.add_argument('--ignoreHostChecking',  help='Ignore known host checking. If your client-side tunnel is not created and you get a message starting "The authenticity of host {xxx} can\'t be established." try enabling this flag.', action='store_true')
 parser.add_argument('--debug',  help='Print helpful debug messages', action='store_true')
 parser.add_argument('--env', type=str, help='load a different env for python')
 
-args = parser.parse_args(['fultob01@minerva.hpc.mssm.edu', 'remote_jupyter'])
-
-bastion_server =
+args = parser.parse_args('chimera minerva_jup -P acc_LOAD --debug'.split(' '))
 
 local_bastion_port = 10001
 
@@ -157,7 +156,8 @@ connection_name = args.connection_name
 connection_filename = 'jupyter_connection_%s' % connection_name
 
 bsub_args = {'queue': args.queue, 'n_cores': args.n_cores,
-             'memory': args.memory, 'remote_path': args.remote_path}
+             'memory': args.memory, 'remote_path': args.remote_path,
+             'account':args.account}
 
 random_local_port = randint(9000,10000)
 random_remote_port = randint(9000,10000)
@@ -172,9 +172,11 @@ connection_status = sb.check_output(connect_check, shell=True).strip().decode()
 if connection_status == 'True' and not args.force_new_connection:
     print('A running job already exists!')
 else:
-	print('No running jobs were found, launching a new one! ')
-    open_connect(base_ssh_cmd, ssh_server, bsub_args,
-        connection_filename, random_local_port, random_remote_port)
+    print('No running jobs were found, launching a new one! ')
+    open_connect(base_ssh_cmd, ssh_server, bsub_args, connection_filename,
+                 random_local_port, random_remote_port, debug=args.debug)
+    ssh_cmd = base_ssh_cmd; server = ssh_server; localport = random_local_port; remoteport = random_remote_port
+    connection_status = True
 
 job_id = sb.check_output('%s %s " head -n 1 ~/%s" 2> /dev/null' % (base_ssh_cmd,ssh_server,connection_filename),shell=True).split('<')[1].split('>')[0]
 random_local_port, random_remote_port = map(int,sb.check_output('%s %s "tail -n 1 ~/%s" 2> /dev/null' % (base_ssh_cmd,ssh_server,connection_filename),shell=True).strip().split(','))

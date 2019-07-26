@@ -17,13 +17,49 @@ import argparse
 import socket
 
 
-def hostname_resolves(hostname):
-    try:
-        socket.gethostbyname(hostname)
-        return True
-    except socket.error:
-        return False
+def resolve_host(ssh_server, custom_error=False, no_check=False):
+    if not custom_error:
+        custom_error = 'Cannot resolve {}. Check server name and try again.'
+    if "@" in ssh_server:
+        user, hostname = ssh_server.split('@')
+    else:
+        import paramiko
+        ssh_config = paramiko.SSHConfig()
+        user_config_file = os.path.expanduser("~/.ssh/config")
+        if os.path.exists(user_config_file):
+            with open(user_config_file) as f:
+                ssh_config.parse(f)
+        else:
+            raise ValueError("User name not specified and no ssh config.")
+        if ssh_server in ssh_config.get_hostnames():
+            ssh_conf_item = ssh_config.lookup(ssh_server)
+            user = ssh_conf_item['user']
+            hostname = ssh_conf_item['hostname']
+        else:
+            raise ValueError("User name not specified and no match in ssh config.")
+    if not no_check:
+        try:
+            socket.gethostbyname(hostname)
+        except socket.error:
+            raise Exception(custom_error.format(hostname))
+    return user, hostname
 
+def bastion_connect(bastion_server, lsf_server, local_bastion_port,
+                    ssh_port=22, debug=False):
+    ce = 'Cannot resolve bastion server {}. Check server name and try again.'
+    bastion_user, bastion_host = resolve_host(bastion_server, custom_error=ce)
+    username, hostname_server = resolve_host(lsf_server, no_check=True)
+
+    #ssh  -L 9000:li03c03:22 username@minerva.hpc.mssm.edu
+
+    #create tunnel via bastion server
+    cmd_bastion_tunnel = 'ssh -N -f -L {0}:{1}:{2} {3} '.format(
+        local_bastion_port,hostname_server,ssh_port,bastion_server)
+    if debug: print(cmd_bastion_tunnel)
+    sb.call(cmd_bastion_tunnel, shell=True)
+
+    return " {0}@{1} -p {2} ".format(
+        bastion_user, "localhost", local_bastion_port)
 
 def query_yes_no(question, default="yes"):
     valid = {"yes":True,   "y":True,  "ye":True,
@@ -104,32 +140,18 @@ parser.add_argument('--env', type=str, help='load a different env for python')
 
 args = parser.parse_args(['fultob01@minerva.hpc.mssm.edu', 'remote_jupyter'])
 
-username, hostname_server = args.lsf_server.split('@')
-
-
-ssh_server = args.lsf_server
-bastion_server = args.bastion_server
+bastion_server =
 
 local_bastion_port = 10001
-ssh_port = 22
 
-if bastion_server:
-    if not hostname_resolves(bastion_server):
-        print('Cannot resolve bastion server %s. Check server name and try again.' % bastion_server)
-        sys.exit(1)
-
-    #ssh  -L 9000:eris1n2.research.partners.org:22 lp698@ssh.research.partners.org
-
-    #create tunnel via bastion server
-    cmd_bastion_tunnel = 'ssh -N -f -L {0}:{1}:{2} {3} '.format(local_bastion_port,hostname_server,ssh_port,bastion_server)
-    if args.debug : print(cmd_bastion_tunnel)
-    sb.call(cmd_bastion_tunnel,shell=True)
-
-    ssh_server = " {0}@{1} -p {2} ".format(username,"localhost", local_bastion_port)
+if args.bastion_server:
+    ssh_server = bastion_connect(args.bastion_server, args.lsf_server,
+                                 local_bastion_port, debug = args.debug)
+else:
+    ssh_server = args.lsf_server
+    username, hostname_server = resolve_host(ssh_server)
 
 base_ssh_cmd = "ssh "
-
-assert hostname_resolves(hostname_server), 'Cannot resolve %s. Check server name and try again.' % hostname_server
 
 connection_name = args.connection_name
 connection_filename = 'jupyter_connection_%s' % connection_name

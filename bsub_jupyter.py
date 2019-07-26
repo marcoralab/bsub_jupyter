@@ -179,8 +179,11 @@ else:
     ssh_cmd = base_ssh_cmd; server = ssh_server; localport = random_local_port; remoteport = random_remote_port
     connection_status = True
 
-job_id = sb.check_output('%s %s " head -n 1 ~/%s" 2> /dev/null' % (base_ssh_cmd,ssh_server,connection_filename),shell=True).split('<')[1].split('>')[0]
-random_local_port, random_remote_port = map(int,sb.check_output('%s %s "tail -n 1 ~/%s" 2> /dev/null' % (base_ssh_cmd,ssh_server,connection_filename),shell=True).strip().split(','))
+
+job_id_find = '%s %s " head -n 1 ~/%s" 2> /dev/null' % (base_ssh_cmd,ssh_server,connection_filename)
+job_id = sb.check_output(job_id_find ,shell=True).split('<')[1].split('>')[0].decode()
+port_set = '%s %s "tail -n 1 ~/%s" 2> /dev/null' % (base_ssh_cmd,ssh_server,connection_filename)
+random_local_port, random_remote_port = map(int,sb.check_output(port_set,shell=True).strip().split(','))
 
 print('JOB ID:',job_id)
 

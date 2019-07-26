@@ -94,7 +94,7 @@ def open_connect(ssh_cmd, server, bsub_args, connection_filename,
     cmd_ssh = '{ssh:s} -t {server:s}'.format(ssh=ssh_cmd, server=server)
     cmd_bsub = ('''bsub -q {queue:s} -n {n_cores:d} -M {memory:d} '''
                 '''-cwd {remote_path:s} -R 'rusage[mem={memory:d}]' '''
-                '''-R span[hosts=1] -P {account:s}''').format(
+                '''-R span[hosts=1] -P {account:s} -W {walltime:s}''').format(
                     **bsub_args)
     cmd_jupyter = '''jupyter notebook --port={:d} --no-browser'''.format(
         remoteport)
@@ -134,6 +134,7 @@ parser.add_argument('--bastion_server',  help='SSH jump server, format username@
 parser.add_argument('-m', '--memory', type=int,  help='Memory to request (per core)', default=4000)
 parser.add_argument('-n', '--n_cores', type=int,  help='# of cores to request', default=2)
 parser.add_argument('-q', '--queue', type=str,  help='Queue to submit job',default='premium')
+parser.add_argument('-W', '--walltime', type=str,  help='runtime',default='140:00')
 parser.add_argument('--force_new_connection',  help='Ignore any existing connection file and start a new connection', action='store_true')
 parser.add_argument('--ignoreHostChecking',  help='Ignore known host checking. If your client-side tunnel is not created and you get a message starting "The authenticity of host {xxx} can\'t be established." try enabling this flag.', action='store_true')
 parser.add_argument('--debug',  help='Print helpful debug messages', action='store_true')
@@ -157,7 +158,7 @@ connection_filename = 'jupyter_connection_%s' % connection_name
 
 bsub_args = {'queue': args.queue, 'n_cores': args.n_cores,
              'memory': args.memory, 'remote_path': args.remote_path,
-             'account':args.account}
+             'account':args.account, 'walltime':args.walltime}
 
 random_local_port = randint(9000,10000)
 random_remote_port = randint(9000,10000)

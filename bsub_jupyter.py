@@ -181,9 +181,10 @@ else:
 
 
 job_id_find = '%s %s " head -n 1 ~/%s" 2> /dev/null' % (base_ssh_cmd,ssh_server,connection_filename)
-job_id = sb.check_output(job_id_find ,shell=True).split('<')[1].split('>')[0].decode()
+job_id = sb.check_output(job_id_find, shell=True).decode().split('<')[1].split('>')[0]
+#import ipdb; ipdb.set_trace()
 port_set = '%s %s "tail -n 1 ~/%s" 2> /dev/null' % (base_ssh_cmd,ssh_server,connection_filename)
-random_local_port, random_remote_port = map(int,sb.check_output(port_set,shell=True).strip().split(','))
+random_local_port, random_remote_port = map(int,sb.check_output(port_set,shell=True).decode().strip().split(','))
 
 print('JOB ID:',job_id)
 
@@ -202,7 +203,8 @@ while server is None:
     if args.debug: print("bjob_command: " + bjob_command)
     p = sb.Popen(bjob_command, stdout=sb.PIPE, stderr=sb.PIPE,shell=True)
     out, err = p.communicate()
-
+    out = out.decode()
+    
     print('.',end = "")
     sys.stdout.flush()
 

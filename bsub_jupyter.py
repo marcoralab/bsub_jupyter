@@ -139,7 +139,7 @@ parser.add_argument('--ignoreHostChecking',  help='Ignore known host checking. I
 parser.add_argument('--debug',  help='Print helpful debug messages', action='store_true')
 parser.add_argument('--env', type=str, help='load a different env for python')
 
-args = parser.parse_args('chimera minerva_jup -P acc_LOAD --debug'.split(' '))
+args = parser.parse_args()
 
 local_bastion_port = 10001
 
